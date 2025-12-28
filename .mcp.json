@@ -3,7 +3,7 @@
     "webshare-quality": {
       "command": "python",
       "args": ["main.py"],
-      "cwd": "/home/shancw/project/webshareIpQualityCheck"
+      "cwd": "/home/shancw/project/webshare-ip-switch"
     }
   }
 }

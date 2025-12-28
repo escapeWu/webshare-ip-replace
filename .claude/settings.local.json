@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Skill(ip-quality-check)",
+      "mcp__webshare-quality__replace_ip_and_check",
+      "Skill(skill-creator)",
+      "Bash(git reset:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "webshare-quality"
+  ]
 }
