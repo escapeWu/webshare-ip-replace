@@ -4,7 +4,7 @@ import requests
 import json
 import subprocess
 from typing import Dict, Any, Optional
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 
 # 环境变量由 MCP (.mcp.json) 或系统环境提供
 # 如果本地开发需要，可选加载 .env 文件
@@ -133,38 +133,47 @@ def webshare_replace_proxy(
     }
 
 @mcp.tool
-def replace_ip_and_check(
-    asn: int = 6079
+async def replace_ip_and_check(
+    asn: int = 6079,
+    ctx: Context = None
 ) -> str:
     """
-    更换一次 IP 并执行质量检测，返回原始检测报告。
+    更换一次 IP 并执行质量检测,返回原始检测报告。
 
     Args:
         asn: 更换 IP 时指定的 ASN (默认 6079)
 
     Returns:
-        JSON 格式结果，包含:
+        JSON 格式结果,包含:
         - status: 执行状态 (success/failed)
         - ip: 新的 IP 地址
         - socks_url: SOCKS5 代理 URL
         - report: 完整的质量检测报告文本
     """
-    # 前置连接检测
+    total_steps = 4
+
+    # Step 1: 前置连接检测
+    if ctx:
+        await ctx.report_progress(progress=1, total=total_steps, message="正在检测 WebShare 连接...")
+
     is_connected, conn_error = check_webshare_connectivity()
     if not is_connected:
         return json.dumps({
             "status": "failed",
+            "step": "connectivity_check",
             "message": conn_error
         }, indent=2)
 
-    # 动态读取环境变量，确保 MCP 注入的环境变量生效
+    # Step 2: 验证环境变量
+    if ctx:
+        await ctx.report_progress(progress=2, total=total_steps, message="正在验证配置...")
+
     token = os.getenv("WEBSHARE_TOKEN")
     plan_id = os.getenv("WEBSHARE_PLAN_ID")
     socks_username = os.getenv("WEBSHARE_SOCKS_USERNAME")
     socks_password = os.getenv("WEBSHARE_SOCKS_PASSWORD")
 
     if not all([token, plan_id, socks_username, socks_password]):
-        # 调试：显示哪些变量缺失
         missing = []
         if not token: missing.append("WEBSHARE_TOKEN")
         if not plan_id: missing.append("WEBSHARE_PLAN_ID")
@@ -174,19 +183,29 @@ def replace_ip_and_check(
         env_keys = [k for k in os.environ.keys() if 'WEBSHARE' in k or 'LLM' in k or 'PROXY' in k]
         return json.dumps({
             "status": "failed",
+            "step": "config_validation",
             "message": f"Missing WebShare configuration: {missing}",
             "available_env_keys": env_keys
         }, indent=2)
+
+    # Step 3: 更换 IP
+    if ctx:
+        await ctx.report_progress(progress=3, total=total_steps, message=f"正在更换 IP (ASN: {asn})...")
 
     res = webshare_replace_proxy(token, plan_id, socks_username, socks_password, asn=asn)
     if not res:
         return json.dumps({
             "status": "failed",
+            "step": "ip_replacement",
             "message": "Failed to replace WebShare proxy IP."
         }, indent=2)
 
     ip = res["ip"]
     cmd = res["cmd"]
+
+    # Step 4: 执行质量检测
+    if ctx:
+        await ctx.report_progress(progress=4, total=total_steps, message=f"正在执行 IP 质量检测 ({ip})...")
 
     try:
         process = subprocess.run(cmd, shell=True, capture_output=True, text=True, executable='/bin/bash', timeout=300)
@@ -194,6 +213,7 @@ def replace_ip_and_check(
     except Exception as e:
         return json.dumps({
             "status": "failed",
+            "step": "quality_check",
             "ip": ip,
             "message": f"Quality check command failed: {str(e)}"
         }, indent=2)

@@ -5,7 +5,9 @@
       "Skill(ip-quality-check)",
       "mcp__webshare-quality__replace_ip_and_check",
       "Skill(skill-creator)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Skill(ip-quality-analyzer)",
+      "Bash(git rm:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
