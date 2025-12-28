@@ -142,14 +142,14 @@ async def replace_ip_and_check_logic(asn: int = 6079) -> str:
         "report": report_text
     }, ensure_ascii=False)
 
-def check_quality(report: str) -> tuple[bool, int, int]:
+def check_quality(report: str, min_low_risk: int = 6, max_commercial: int = 2) -> tuple[bool, int, int]:
     # 移除 ANSI 转义序列以便正确匹配
     clean_report = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', report)
 
     low_risk_count = len(re.findall(r"低风险", clean_report))
     business_count = len(re.findall(r"商业", clean_report))
 
-    is_good = low_risk_count >= 6 and business_count <= 2
+    is_good = low_risk_count >= min_low_risk and business_count <= max_commercial
     return is_good, low_risk_count, business_count
 
 def save_report(ip: str, report: str):
@@ -162,13 +162,18 @@ async def main():
     parser = argparse.ArgumentParser(description="Find High Quality IP")
     parser.add_argument("--asn", type=int, default=6079, help="ASN number (default: 6079)")
     parser.add_argument("--max-tries", type=int, default=50, help="Maximum number of tries (default: 50)")
+    parser.add_argument("--min-low-risk", type=int, default=6, help="Minimum 'low risk' count (default: 6)")
+    parser.add_argument("--max-commercial", type=int, default=2, help="Maximum 'commercial' count (default: 2)")
     args = parser.parse_args()
 
     asn = args.asn
     max_tries = args.max_tries
+    min_low_risk = args.min_low_risk
+    max_commercial = args.max_commercial
 
     # 1. Removed Pre-check test-report.log
     print(f"Starting search for high quality IP. ASN: {asn}, Max Tries: {max_tries}")
+    print(f"Thresholds -> Min Low Risk: {min_low_risk}, Max Commercial: {max_commercial}")
 
     for i in range(1, max_tries + 1):
         print(f"\n[Attempt {i}/{max_tries}] Replacing IP and checking quality...")
@@ -191,9 +196,9 @@ async def main():
         # Save report for every attempt
         save_report(ip, report)
 
-        is_good, low_risk, business = check_quality(report)
+        is_good, low_risk, business = check_quality(report, min_low_risk, max_commercial)
         print(f"IP: {ip}")
-        print(f"Counts -> 低风险: {low_risk}, 商业: {business}")
+        print(f"Counts -> 低风险: {low_risk} (Target >= {min_low_risk}), 商业: {business} (Target <= {max_commercial})")
 
         if is_good:
             print(f"\n✨ SUCCESS! High quality IP found: {ip}")
