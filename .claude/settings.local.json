@@ -7,7 +7,8 @@
       "Skill(skill-creator)",
       "Bash(git reset:*)",
       "Skill(ip-quality-analyzer)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(env:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
