@@ -1,0 +1,11 @@
+# WebShare IP Quality 项目依赖
+
+# HTTP 请求库
+requests>=2.31.0
+
+# FastMCP 服务器框架
+fastmcp>=0.1.0
+
+# 环境变量加载 (可选，但推荐用于本地开发)
+python-dotenv>=1.0.0
+

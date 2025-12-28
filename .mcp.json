@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "webshare-quality": {
+      "command": "python",
+      "args": ["main.py"],
+      "cwd": "/home/shancw/project/webshareIpQualityCheck"
+    }
+  }
+}
