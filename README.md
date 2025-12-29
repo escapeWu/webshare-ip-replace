@@ -12,8 +12,10 @@
 ## 命令行执行
 除了在 Claude 内使用，你也可以直接使用 `find_ip.py` 脚本：
 ```bash
-python find_ip.py --asn 6079 --max-tries 50
+python find_ip.py --asn 6079 --max-tries 50 --min-low-risk 5 --max-commercial 2
 ```
 - `--asn`: 指定 ASN 号码（默认: 6079）
 - `--max-tries`: 最大尝试次数（默认: 50）
-该脚本会自动循环更换 IP 并检测，直到找到符合高质量标准的 IP 为止（“低风险” >= 6 且 “商业” <= 2）。找到后会保存到 `found_ip.json`。
+- `--min-low-risk`: 低风险 关键字数量
+- `--max-commercial`: 商业 关键字数量
+该脚本会自动循环更换 IP 并检测，直到找到符合高质量标准的 IP 为止（“低风险” >= min-low-risk 且 “商业” <= max-commercial）。找到后会保存到 `found_ip.json`。
