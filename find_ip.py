@@ -24,26 +24,13 @@ def get_request_proxies():
         proxies["https"] = HTTPS_PROXY
     return proxies if proxies else None
 
-def check_webshare_connectivity() -> tuple[bool, str]:
-    try:
-        proxies = get_request_proxies()
-        response = requests.get(
-            "https://dashboard.webshare.io",
-            proxies=proxies,
-            timeout=5
-        )
-        if response.status_code == 200:
-            return True, ""
-        return False, f"WebShare returned status code: {response.status_code}"
-    except Exception as e:
-        return False, f"Connectivity error: {str(e)}"
-
 def webshare_replace_proxy(
     token: str,
     plan_id: str,
     socks_username: str,
     socks_password: str,
-    asn: int = 6079,
+    asn: Optional[int] = None,
+    ip_ranges: Optional[list[str]] = None,
     wait_seconds: int = 5
 ) -> Dict[str, Any] | None:
     headers = {
@@ -69,9 +56,16 @@ def webshare_replace_proxy(
 
     def replace(ip):
         url = f"https://proxy.webshare.io/api/v2/proxy/replace/?plan_id={plan_id}"
+
+        # 优先级：如果指定了 ip_ranges，则使用 ip_range；否则使用 asn
+        if ip_ranges:
+            replace_with = [{"type": "ip_range", "ip_ranges": ip_ranges}]
+        else:
+            replace_with = [{"type": "asn", "asn_numbers": [asn] if asn else [6079]}]
+
         data = {
             "to_replace": {"type": "ip_address", "ip_addresses": [ip]},
-            "replace_with": [{"type": "asn", "asn_numbers": [asn]}],
+            "replace_with": replace_with,
             "dry_run": False
         }
         try:
@@ -109,11 +103,7 @@ def webshare_replace_proxy(
         "socks_url": socks_url
     }
 
-async def replace_ip_and_check_logic(asn: int = 6079) -> str:
-    is_connected, conn_error = check_webshare_connectivity()
-    if not is_connected:
-        return json.dumps({"status": "failed", "message": conn_error})
-
+async def replace_ip_and_check_logic(asn: Optional[int] = None, ip_ranges: Optional[list[str]] = None) -> str:
     token = os.getenv("WEBSHARE_TOKEN")
     plan_id = os.getenv("WEBSHARE_PLAN_ID")
     socks_username = os.getenv("WEBSHARE_SOCKS_USERNAME")
@@ -122,7 +112,7 @@ async def replace_ip_and_check_logic(asn: int = 6079) -> str:
     if not all([token, plan_id, socks_username, socks_password]):
         return json.dumps({"status": "failed", "message": "Missing environment variables"})
 
-    res = webshare_replace_proxy(token, plan_id, socks_username, socks_password, asn=asn)
+    res = webshare_replace_proxy(token, plan_id, socks_username, socks_password, asn=asn, ip_ranges=ip_ranges)
     if not res:
         return json.dumps({"status": "failed", "message": "Failed to replace IP"})
 
@@ -160,26 +150,34 @@ def save_report(ip: str, report: str):
 
 async def main():
     parser = argparse.ArgumentParser(description="Find High Quality IP")
-    parser.add_argument("--asn", type=int, default=6079, help="ASN number (default: 6079)")
+    parser.add_argument("--asn", type=int, help="ASN number (default: 6079 if no ip-range)")
+    parser.add_argument("--ip-range", type=str, help="IP range to replace with (e.g. 45.0.0.0/8)")
     parser.add_argument("--max-tries", type=int, default=50, help="Maximum number of tries (default: 50)")
     parser.add_argument("--min-low-risk", type=int, default=6, help="Minimum 'low risk' count (default: 6)")
     parser.add_argument("--max-commercial", type=int, default=2, help="Maximum 'commercial' count (default: 2)")
     args = parser.parse_args()
 
     asn = args.asn
+    ip_range = args.ip_range
+    ip_ranges = [ip_range] if ip_range else None
+
+    # If neither is provided, default to ASN 6079
+    if not asn and not ip_ranges:
+        asn = 6079
+
     max_tries = args.max_tries
     min_low_risk = args.min_low_risk
     max_commercial = args.max_commercial
 
     # 1. Removed Pre-check test-report.log
-    print(f"Starting search for high quality IP. ASN: {asn}, Max Tries: {max_tries}")
+    print(f"Starting search for high quality IP. ASN: {asn}, Range: {ip_range}, Max Tries: {max_tries}")
     print(f"Thresholds -> Min Low Risk: {min_low_risk}, Max Commercial: {max_commercial}")
 
     for i in range(1, max_tries + 1):
         print(f"\n[Attempt {i}/{max_tries}] Replacing IP and checking quality...")
 
         try:
-            result_json = await replace_ip_and_check_logic(asn=asn)
+            result_json = await replace_ip_and_check_logic(asn=asn, ip_ranges=ip_ranges)
             result = json.loads(result_json)
         except Exception as e:
             print(f"Unexpected error: {e}")
